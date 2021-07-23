@@ -1,2 +1,2 @@
 # robotic-finger
-A mechanical finger that repeats a real finger's action
+A mechanical finger that emulates a real finger's action

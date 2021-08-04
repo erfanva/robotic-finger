@@ -5,14 +5,24 @@ import numpy as np
 import serial
 
 ### config serial
-arduino = serial.Serial(port='COM3', baudrate=9600, timeout=.1)
+def connect_arduino():
+    try:
+        return serial.Serial(port='COM3', baudrate=9600, timeout=.1)
+    except:
+        print("Cant connect to arduino!")
+        return None
+arduino = connect_arduino()
 
 ### config medialpipe
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 
-###
-joint_list = [[8,7,6], [12,11,10], [16,15,14], [20,19,18]]
+# list 1 for top joints
+joint_list1 = [[8,7,6], [12,11,10], [16,15,14], [20,19,18]]
+# list 2 for middle joints
+joint_list2 = [[7,6,5], [11,10,9], [15,14,13], [19,18,17]]
+# list 3 for bottom joints
+joint_list3 = [[6,5,0], [10,9,0], [14,13,0], [18,17,0]]
 
 ###
 def find_finger_angles(image, results, joint_list):
@@ -42,7 +52,7 @@ def find_finger_angles(image, results, joint_list):
 
 
 ### open camera
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 
 # search for hands until camera is open
 with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) as hands: 
@@ -81,9 +91,16 @@ with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) a
                 
             
             # Find and Draw angles to image from joint list
-            angles = find_finger_angles(image, results, joint_list)
+            # angles1 is for top finger joint angle
+            angles1 = find_finger_angles(image, results, joint_list1)
+            # middle joint
+            angles2 = find_finger_angles(image, results, joint_list2)
+            # bottom joint
+            angles3 = find_finger_angles(image, results, joint_list3)
 
-            first_hand_angles = angles[0]
+            # find_finger_angles function detects up to 2 hands. one of them is enough for us.
+            first_hand_angles = angles1[0]
+            # we need only the angle of index finger
             index_finger_angle = first_hand_angles[0]
 
             # update angles history
@@ -91,10 +108,13 @@ with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) a
             angles_history.append(index_finger_angle)
 
             # command to robot
-            if angles_history[0] <= 140 and angles_history[1] <= 140 and angles_history[2] <= 140:
-                arduino.write(bytes('0', 'utf-8'))
-            elif angles_history[0] > 140 and angles_history[1] > 140 and angles_history[2] > 140:
-                arduino.write(bytes('1', 'utf-8'))
+            if arduino != None:
+                if angles_history[0] <= 140 and angles_history[1] <= 140 and angles_history[2] <= 140:
+                    arduino.write(bytes('0', 'utf-8'))
+                elif angles_history[0] > 140 and angles_history[1] > 140 and angles_history[2] > 140:
+                    arduino.write(bytes('1', 'utf-8'))
+            else:
+                arduino = connect_arduino()
             
         cv2.imshow('Hand Tracking (press "q" to exit)', image)
 

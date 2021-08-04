@@ -109,10 +109,9 @@ with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) a
 
             # command to robot
             if arduino != None:
-                if angles_history[0] <= 140 and angles_history[1] <= 140 and angles_history[2] <= 140:
-                    arduino.write(bytes('0', 'utf-8'))
-                elif angles_history[0] > 140 and angles_history[1] > 140 and angles_history[2] > 140:
-                    arduino.write(bytes('1', 'utf-8'))
+                temp = round(sum(angles_history)/len(angles_history))
+                temp = 180 - temp # servo position is inverted
+                arduino.write(bytes(temp, 'utf-8'))
             else:
                 arduino = connect_arduino()
             

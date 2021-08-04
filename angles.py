@@ -4,11 +4,10 @@ import cv2
 import numpy as np
 import serial
 
-###
+### config serial
 arduino = serial.Serial(port='COM3', baudrate=9600, timeout=.1)
-###
-temp = [180, 180, 180]
-###
+
+### config medialpipe
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 
@@ -42,10 +41,12 @@ def find_finger_angles(image, results, joint_list):
     return res_angles
 
 
-###
+### open camera
 cap = cv2.VideoCapture(1)
 
+# search for hands until camera is open
 with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) as hands: 
+    angles_history = [180, 180, 180]
     while cap.isOpened():
         ret, frame = cap.read()
         
@@ -84,19 +85,18 @@ with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) a
 
             first_hand_angles = angles[0]
             index_finger_angle = first_hand_angles[0]
-            del temp[0]
-            temp.append(index_finger_angle)
-            #### command to robot
-            # print('first')
-            # print(index_finger_angle)
-            if temp[0] <= 140 and temp[1] <= 140 and temp[2] <= 140:
+
+            # update angles history
+            del angles_history[0]
+            angles_history.append(index_finger_angle)
+
+            # command to robot
+            if angles_history[0] <= 140 and angles_history[1] <= 140 and angles_history[2] <= 140:
                 arduino.write(bytes('0', 'utf-8'))
-            elif temp[0] > 140 and temp[1] > 140 and temp[2] > 140:
+            elif angles_history[0] > 140 and angles_history[1] > 140 and angles_history[2] > 140:
                 arduino.write(bytes('1', 'utf-8'))
             
-        # Save our image    
-        #cv2.imwrite(os.path.join('Output Images', '{}.jpg'.format(uuid.uuid1())), image)
-        cv2.imshow('Hand Tracking', image)
+        cv2.imshow('Hand Tracking (press "q" to exit)', image)
 
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break

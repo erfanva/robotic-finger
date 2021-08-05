@@ -3,17 +3,27 @@ import mediapipe as mp
 import cv2
 import numpy as np
 import serial
+import math
 
-###
-arduino = serial.Serial(port='COM3', baudrate=9600, timeout=.1)
-###
-temp = [180, 180, 180]
-###
+### config serial
+# def connect_arduino():
+#     try:
+#         return serial.Serial(port='COM3', baudrate=9600, timeout=.1)
+#     except:
+#         print("Cant connect to arduino!")
+#         return None
+arduino = serial.Serial(port='COM3', baudrate=9600, timeout=.1) #connect_arduino()
+
+### config medialpipe
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 
-###
-joint_list = [[8,7,6], [12,11,10], [16,15,14], [20,19,18]]
+# list 1 for top joints
+joint_list1 = [[8,7,6], [12,11,10], [16,15,14], [20,19,18]]
+# list 2 for middle joints
+joint_list2 = [[7,6,5], [11,10,9], [15,14,13], [19,18,17]]
+# list 3 for bottom joints
+joint_list3 = [[6,5,0], [10,9,0], [14,13,0], [18,17,0]]
 
 ###
 def find_finger_angles(image, results, joint_list):
@@ -42,10 +52,12 @@ def find_finger_angles(image, results, joint_list):
     return res_angles
 
 
-###
+### open camera
 cap = cv2.VideoCapture(1)
 
+# search for hands until camera is open
 with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) as hands: 
+    angles_history = [180, 180, 180]
     while cap.isOpened():
         ret, frame = cap.read()
         
@@ -80,23 +92,34 @@ with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) a
                 
             
             # Find and Draw angles to image from joint list
-            angles = find_finger_angles(image, results, joint_list)
+            # angles1 is for top finger joint angle
+            angles1 = find_finger_angles(image, results, joint_list1)
+            # middle joint
+            angles2 = find_finger_angles(image, results, joint_list2)
+            # bottom joint
+            angles3 = find_finger_angles(image, results, joint_list3)
 
-            first_hand_angles = angles[0]
+            # find_finger_angles function detects up to 2 hands. one of them is enough for us.
+            first_hand_angles = angles2[0]
+            # we need only the angle of index finger
             index_finger_angle = first_hand_angles[0]
-            del temp[0]
-            temp.append(index_finger_angle)
-            #### command to robot
-            # print('first')
-            # print(index_finger_angle)
-            if temp[0] <= 140 and temp[1] <= 140 and temp[2] <= 140:
-                arduino.write(bytes('0', 'utf-8'))
-            elif temp[0] > 140 and temp[1] > 140 and temp[2] > 140:
-                arduino.write(bytes('1', 'utf-8'))
+
+            # update angles history
+            del angles_history[0]
+            angles_history.append(index_finger_angle)
+
+            # command to robot
+            # if arduino != None:
+            temp1 = sum(angles_history)/len(angles_history)# servo position is inverted
+            temp = temp1 - 100
+            if temp < 0: temp = 0
+            temp = math.floor(temp / 8)
+            print(temp1, temp, temp*20)
+            arduino.write(bytes(str(temp), 'utf-8'))
+            # else:
+            #     arduino = connect_arduino()
             
-        # Save our image    
-        #cv2.imwrite(os.path.join('Output Images', '{}.jpg'.format(uuid.uuid1())), image)
-        cv2.imshow('Hand Tracking', image)
+        cv2.imshow('Hand Tracking (press "q" to exit)', image)
 
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break

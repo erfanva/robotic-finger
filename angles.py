@@ -1,8 +1,15 @@
+"""
+This program uses Mediapip to finds the fingers angles. 
+Then map it to an integer number between 0 to 9.
+After that write the result on the serial port to command it to the robotic finger.
+"""
+
 ### Imports
 import mediapipe as mp
 import cv2
 import numpy as np
 import serial
+import math
 
 ### config serial
 def connect_arduino():
@@ -18,11 +25,11 @@ mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 
 # list 1 for top joints
-joint_list1 = [[8,7,6], [12,11,10], [16,15,14], [20,19,18]]
+joint_list1 = [[8,7,6]] # other fingers: [12,11,10], [16,15,14], [20,19,18]
 # list 2 for middle joints
-joint_list2 = [[7,6,5], [11,10,9], [15,14,13], [19,18,17]]
+joint_list2 = [[7,6,5]] # other fingers: [11,10,9], [15,14,13], [19,18,17]
 # list 3 for bottom joints
-joint_list3 = [[6,5,0], [10,9,0], [14,13,0], [18,17,0]]
+joint_list3 = [[6,5,0]] # other fingers: [10,9,0], [14,13,0], [18,17,0]
 
 ###
 def find_finger_angles(image, results, joint_list):
@@ -52,7 +59,7 @@ def find_finger_angles(image, results, joint_list):
 
 
 ### open camera
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 
 # search for hands until camera is open
 with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) as hands: 
@@ -99,7 +106,7 @@ with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) a
             angles3 = find_finger_angles(image, results, joint_list3)
 
             # find_finger_angles function detects up to 2 hands. one of them is enough for us.
-            first_hand_angles = angles1[0]
+            first_hand_angles = angles2[0]
             # we need only the angle of index finger
             index_finger_angle = first_hand_angles[0]
 
@@ -109,11 +116,14 @@ with mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5) a
 
             # command to robot
             if arduino != None:
-                temp = round(sum(angles_history)/len(angles_history))
-                temp = 180 - temp # servo position is inverted
-                arduino.write(bytes(temp, 'utf-8'))
+                temp1 = sum(angles_history)/len(angles_history) # average of recent angles
+                temp = temp1 - 100 # our robotic finger closed angle is about 100 degree. So we map 0-180 to 0-9
+                if temp < 0: temp = 0 # the minimum is 0
+                temp = math.floor(temp / 8) # map the float 0-80 result to integer 0-9
+                print(temp1, temp, temp*20) # log(detected angle, the 0-9 mapping result, the excepted servo position)
+                arduino.write(bytes(str(temp), 'utf-8')) # command to robot
             else:
-                arduino = connect_arduino()
+                arduino = connect_arduino() 
             
         cv2.imshow('Hand Tracking (press "q" to exit)', image)
 
